@@ -7,7 +7,7 @@ httpx==0.27.2
 pytest==8.3.3
 pytest-asyncio==0.24.0
 sqlalchemy==2.0.35
-# asyncpg==0.29.0  # Requires MSVC build tools on Windows / Python 3.13
+asyncpg==0.29.0  # Requires MSVC build tools on Windows / Python 3.13
 aiosqlite==0.20.0
 greenlet==3.1.1
 celery==5.4.0
