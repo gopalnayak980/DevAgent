@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Activity, RefreshCw } from "lucide-react";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function Observability() {
+  const { authFetch } = useAuth();
   const [stats, setStats] = useState(null);
   const [traces, setTraces] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -14,8 +14,8 @@ export default function Observability() {
     setError(null);
     try {
       const [statsRes, tracesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/observability/stats`),
-        fetch(`${API_BASE_URL}/api/observability/traces`),
+        authFetch(`/api/observability/stats`),
+        authFetch(`/api/observability/traces`),
       ]);
 
       if (!statsRes.ok || !tracesRes.ok) {

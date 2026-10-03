@@ -64,17 +64,26 @@ class Settings:
     )
 
 
+    # -----------------------------------------------------------------------
+    # Phase 10.2 — Authentication settings
+    # -----------------------------------------------------------------------
+    
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
+
 # Singleton settings instance
 settings = Settings()
 
 
 # ---------------------------------------------------------------------------
-# Phase 10.1 — Startup validation
+# Phase 10.1 & 10.2 — Startup validation
 # ---------------------------------------------------------------------------
 
-_SECRET_FIELDS = {"LLM_API_KEY"}
+_SECRET_FIELDS = {"LLM_API_KEY", "JWT_SECRET_KEY"}
 _REDACTED_FIELDS = {
-    "LLM_API_KEY", "DATABASE_URL", "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND",
+    "LLM_API_KEY", "DATABASE_URL", "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND", "JWT_SECRET_KEY"
 }
 
 
@@ -100,6 +109,11 @@ def validate_settings() -> list[str]:
         warnings.append(
             "CORS_ORIGINS contains '*'. This is insecure when credentials are enabled. "
             "Use explicit origins in production."
+        )
+
+    if not settings.JWT_SECRET_KEY or settings.JWT_SECRET_KEY == "CHANGE_ME_IN_PRODUCTION_OR_ELSE":
+        warnings.append(
+            "JWT_SECRET_KEY is missing or set to a default value. Authentication is insecure!"
         )
 
     for w in warnings:

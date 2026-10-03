@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Zap, Clock, Play, CheckCircle2, XCircle, Ban, AlertCircle } from "lucide-react";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 const STATUS_CONFIG = {
   pending: { label: "Pending", color: "var(--color-text-secondary)", icon: <Clock size={16} /> },
@@ -12,6 +11,7 @@ const STATUS_CONFIG = {
 };
 
 export default function BackgroundJobs() {
+  const { authFetch } = useAuth();
   const [taskInput, setTaskInput] = useState("");
   const [currentJob, setCurrentJob] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,7 +26,7 @@ export default function BackgroundJobs() {
     ) {
       pollRef.current = setInterval(async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/jobs/${currentJob.job_id}`);
+          const res = await authFetch(`/api/jobs/${currentJob.job_id}`);
           if (res.ok) {
             const data = await res.json();
             setCurrentJob(data);
@@ -55,9 +55,8 @@ export default function BackgroundJobs() {
     setCurrentJob(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/jobs`, {
+      const res = await authFetch(`/api/jobs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: taskInput.trim() }),
       });
 
@@ -83,8 +82,8 @@ export default function BackgroundJobs() {
   const cancelJob = useCallback(async () => {
     if (!currentJob) return;
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/jobs/${currentJob.job_id}/cancel`,
+      const res = await authFetch(
+        `/api/jobs/${currentJob.job_id}/cancel`,
         { method: "POST" }
       );
       if (res.ok) {

@@ -118,13 +118,13 @@ class TraceService:
         """Retrieve a single trace by ID."""
         return await self.repository.get_by_id(trace_id)
 
-    async def list_traces(self, limit: int = 50) -> list[ExecutionTrace]:
+    async def list_traces(self, limit: int = 50, user_id: Optional[str] = None) -> list[ExecutionTrace]:
         """List recent traces."""
-        return await self.repository.list_all(limit=limit)
+        return await self.repository.list_all(limit=limit, user_id=user_id)
 
-    async def get_stats(self) -> ObservabilityStats:
+    async def get_stats(self, user_id: Optional[str] = None) -> ObservabilityStats:
         """Get aggregate statistics."""
-        stats_dict = await self.repository.get_stats()
+        stats_dict = await self.repository.get_stats(user_id=user_id)
         return ObservabilityStats(**stats_dict)
 
     @staticmethod

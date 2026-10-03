@@ -2,11 +2,26 @@ import uuid
 import json
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, DateTime, ForeignKey, Text, Integer, Float
+from sqlalchemy import String, DateTime, ForeignKey, Text, Integer, Float, Boolean, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 
 class Base(DeclarativeBase):
     pass
+
+
+class User(Base):
+    """Phase 10.2 — Authenticated user account."""
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, default="user", nullable=False)  # 'user' | 'admin'
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class ApprovalRequest(Base):

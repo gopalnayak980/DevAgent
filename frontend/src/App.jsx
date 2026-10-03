@@ -8,10 +8,13 @@ import BackgroundJobs from "./components/BackgroundJobs.jsx";
 import Observability from "./components/Observability.jsx";
 import ApprovalsPanel from "./components/ApprovalsPanel.jsx";
 import MemoryPanel from "./components/MemoryPanel.jsx";
+import AuthPage from "./components/AuthPage.jsx";
+import { useAuth } from "./contexts/AuthContext.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function App() {
+  const { user, isLoading: isAuthLoading, authFetch, logout } = useAuth();
   const [messages, setMessages] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatError, setChatError] = useState(null);
@@ -27,9 +30,8 @@ export default function App() {
       setIsChatLoading(true);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        const response = await authFetch(`/api/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text.trim() }),
         });
 
@@ -73,7 +75,7 @@ export default function App() {
     async (approvalId, action) => {
       setIsChatLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/approvals/${approvalId}/${action}`, {
+        const response = await authFetch(`/api/approvals/${approvalId}/${action}`, {
           method: "POST",
         });
 
@@ -148,8 +150,16 @@ export default function App() {
     }
   };
 
+  if (isAuthLoading) {
+    return <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', color: 'var(--text-primary)' }}>Loading...</div>;
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
   return (
-    <DashboardLayout activeView={activeView} setActiveView={setActiveView}>
+    <DashboardLayout activeView={activeView} setActiveView={setActiveView} user={user} logout={logout}>
       {renderActiveView()}
     </DashboardLayout>
   );

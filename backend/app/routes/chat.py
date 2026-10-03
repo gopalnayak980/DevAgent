@@ -25,6 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database.session import get_db
+from app.database.models import User
+from app.auth.dependencies import get_current_active_user
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.agents.supervisor import analyze as supervisor_analyze
 from app.agents.router import get_agent_for_intent
@@ -79,7 +81,11 @@ def _enrich_prompt_with_tool(user_prompt: str, tool_decision) -> str:
 
 
 @router.post("/chat", response_model=HITLChatResponse)
-async def chat(request: ChatRequest, session: AsyncSession = Depends(get_db)):
+async def chat(
+    request: ChatRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Accept a user message and return an AI-generated response."""
 
     message = request.message.strip()
@@ -95,7 +101,7 @@ async def chat(request: ChatRequest, session: AsyncSession = Depends(get_db)):
             detail=f"Message exceeds maximum length of {settings.MAX_MESSAGE_LENGTH} characters.",
         )
 
-    user_id = "default-user"
+    user_id = current_user.id
 
     # ------------------------------------------------------------------
     # Phase 6 — Check if the message requires HITL approval

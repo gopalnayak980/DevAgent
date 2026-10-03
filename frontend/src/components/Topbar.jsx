@@ -1,7 +1,7 @@
 import { useTheme } from "../contexts/ThemeContext.jsx";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, LogOut } from "lucide-react";
 
-export default function Topbar({ activeView }) {
+export default function Topbar({ activeView, user, logout }) {
   const { theme, toggleTheme } = useTheme();
   const getViewTitle = () => {
     switch (activeView) {
@@ -28,10 +28,20 @@ export default function Topbar({ activeView }) {
         >
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
-        <div className="topbar-user">
-          <div className="user-avatar">U</div>
-          <span className="user-name">Developer</span>
+        <div className="topbar-user" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="user-avatar">{user?.name ? user.name[0].toUpperCase() : 'U'}</div>
+          <span className="user-name">{user?.name || "Developer"}</span>
         </div>
+        {logout && (
+          <button 
+            onClick={logout} 
+            className="btn-icon" 
+            title="Logout"
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+          >
+            <LogOut size={20} />
+          </button>
+        )}
       </div>
     </header>
   );

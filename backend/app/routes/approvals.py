@@ -15,6 +15,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
+from app.database.models import User
+from app.auth.dependencies import get_current_active_user
 from app.hitl.repository import ApprovalRepository
 from app.hitl.service import (
     HumanApprovalService,
@@ -46,10 +48,11 @@ def _get_service(session: AsyncSession) -> HumanApprovalService:
 async def create_approval(
     request: ApprovalCreateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create a new approval request."""
     service = _get_service(session)
-    user_id = "default-user"  # Same convention as chat route
+    user_id = current_user.id
 
     approval = await service.create_approval(
         user_id=user_id,
@@ -64,10 +67,13 @@ async def create_approval(
 # ---------------------------------------------------------------------------
 
 @router.get("/approvals", response_model=ApprovalListResponse)
-async def list_approvals(session: AsyncSession = Depends(get_db)):
-    """List all approval requests."""
+async def list_approvals(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List all approval requests for current user."""
     service = _get_service(session)
-    approvals = await service.list_approvals()
+    approvals = await service.list_approvals(user_id=current_user.id)
     return ApprovalListResponse(
         approvals=[ApprovalResponse.model_validate(a) for a in approvals],
         total=len(approvals),
@@ -82,11 +88,14 @@ async def list_approvals(session: AsyncSession = Depends(get_db)):
 async def get_approval(
     approval_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get a single approval request by ID."""
     service = _get_service(session)
     try:
         approval = await service.get_approval(approval_id)
+        if approval.user_id != current_user.id:
+            raise ApprovalNotFoundError()
     except ApprovalNotFoundError:
         raise HTTPException(status_code=404, detail=f"Approval request '{approval_id}' not found.")
     return ApprovalResponse.model_validate(approval)
@@ -100,10 +109,14 @@ async def get_approval(
 async def approve_request(
     approval_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Approve a pending approval request."""
     service = _get_service(session)
     try:
+        approval = await service.get_approval(approval_id)
+        if approval.user_id != current_user.id:
+            raise ApprovalNotFoundError()
         approval = await service.approve(approval_id)
     except ApprovalNotFoundError:
         raise HTTPException(status_code=404, detail=f"Approval request '{approval_id}' not found.")
@@ -128,10 +141,14 @@ async def approve_request(
 async def reject_request(
     approval_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Reject a pending approval request."""
     service = _get_service(session)
     try:
+        approval = await service.get_approval(approval_id)
+        if approval.user_id != current_user.id:
+            raise ApprovalNotFoundError()
         approval = await service.reject(approval_id)
     except ApprovalNotFoundError:
         raise HTTPException(status_code=404, detail=f"Approval request '{approval_id}' not found.")
@@ -153,10 +170,14 @@ async def reject_request(
 async def cancel_request(
     approval_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Cancel a pending approval request."""
     service = _get_service(session)
     try:
+        approval = await service.get_approval(approval_id)
+        if approval.user_id != current_user.id:
+            raise ApprovalNotFoundError()
         approval = await service.cancel(approval_id)
     except ApprovalNotFoundError:
         raise HTTPException(status_code=404, detail=f"Approval request '{approval_id}' not found.")
@@ -178,6 +199,7 @@ async def cancel_request(
 async def execute_approved_action(
     approval_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Execute the protected action for an approved request.
 
@@ -185,6 +207,9 @@ async def execute_approved_action(
     """
     service = _get_service(session)
     try:
+        approval = await service.get_approval(approval_id)
+        if approval.user_id != current_user.id:
+            raise ApprovalNotFoundError()
         result = await service.execute_if_approved(approval_id)
     except ApprovalNotFoundError:
         raise HTTPException(status_code=404, detail=f"Approval request '{approval_id}' not found.")

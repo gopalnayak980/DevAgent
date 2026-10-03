@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Activity, CheckCircle, XCircle, Clock, ShieldAlert, ChevronRight } from "lucide-react";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function DashboardHome({ setActiveView }) {
+  const { authFetch } = useAuth();
   const [stats, setStats] = useState(null);
   const [recentJobs, setRecentJobs] = useState([]);
   const [recentApprovals, setRecentApprovals] = useState([]);
@@ -16,9 +16,9 @@ export default function DashboardHome({ setActiveView }) {
     try {
       // Fetch observability stats, recent jobs, and approvals concurrently
       const [statsRes, jobsRes, approvalsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/observability/stats`),
-        fetch(`${API_BASE_URL}/api/jobs`),
-        fetch(`${API_BASE_URL}/api/approvals`),
+        authFetch(`/api/observability/stats`),
+        authFetch(`/api/jobs`),
+        authFetch(`/api/approvals`),
       ]);
 
       if (!statsRes.ok || !jobsRes.ok || !approvalsRes.ok) {
@@ -37,7 +37,7 @@ export default function DashboardHome({ setActiveView }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authFetch]);
 
   useEffect(() => {
     fetchOverviewData();

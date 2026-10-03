@@ -14,6 +14,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
+from app.database.models import User
+from app.auth.dependencies import get_current_active_user
 from app.jobs.repository import JobRepository
 from app.jobs.service import (
     JobService,
@@ -66,6 +68,7 @@ def _dispatch_celery_task(job_id: str) -> None:
 async def create_job(
     request: JobCreateRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create a new background job and return immediately.
 
@@ -73,7 +76,7 @@ async def create_job(
     to check status and retrieve results.
     """
     service = _get_service(session)
-    user_id = "default-user"  # Same convention as chat route
+    user_id = current_user.id
 
     try:
         job = await service.create_job(
@@ -98,10 +101,13 @@ async def create_job(
 # ---------------------------------------------------------------------------
 
 @router.get("/jobs", response_model=JobListResponse)
-async def list_jobs(session: AsyncSession = Depends(get_db)):
-    """List all background jobs."""
+async def list_jobs(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List all background jobs for the current user."""
     service = _get_service(session)
-    jobs = await service.list_jobs()
+    jobs = await service.list_jobs(user_id=current_user.id)
     return JobListResponse(
         jobs=[
             JobStatusResponse(
@@ -129,11 +135,14 @@ async def list_jobs(session: AsyncSession = Depends(get_db)):
 async def get_job_status(
     job_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get the status and result of a background job."""
     service = _get_service(session)
     try:
         job = await service.get_job(job_id)
+        if job.user_id != current_user.id:
+            raise JobNotFoundError()
     except JobNotFoundError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
 
@@ -158,6 +167,7 @@ async def get_job_status(
 async def cancel_job(
     job_id: str,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Cancel a pending background job.
 
@@ -166,6 +176,10 @@ async def cancel_job(
     """
     service = _get_service(session)
     try:
+        # Check ownership first
+        job = await service.get_job(job_id)
+        if job.user_id != current_user.id:
+            raise JobNotFoundError()
         job = await service.cancel_job(job_id)
     except JobNotFoundError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")

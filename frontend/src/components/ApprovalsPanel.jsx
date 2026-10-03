@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Shield, RefreshCw } from "lucide-react";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 export default function ApprovalsPanel() {
+  const { authFetch } = useAuth();
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +13,7 @@ export default function ApprovalsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/approvals`);
+      const response = await authFetch(`/api/approvals`);
       if (!response.ok) {
         throw new Error("Failed to fetch approvals.");
       }
@@ -33,7 +33,7 @@ export default function ApprovalsPanel() {
   const handleAction = async (approvalId, action) => {
     setActionLoading(approvalId);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/approvals/${approvalId}/${action}`, {
+      const response = await authFetch(`/api/approvals/${approvalId}/${action}`, {
         method: "POST",
       });
 
