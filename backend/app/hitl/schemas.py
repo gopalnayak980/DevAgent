@@ -83,3 +83,7 @@ class HITLChatResponse(BaseModel):
         default=None,
         description="The approval request details, if approval is required.",
     )
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="The ID of the active conversation.",
+    )

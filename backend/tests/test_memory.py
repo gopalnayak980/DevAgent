@@ -49,13 +49,16 @@ async def test_memory_service(setup_test_db):
     assert "(preference)" in context
     assert "(goal)" in context
     
-    # Test conversation logic
+    # Test conversation logic — ensure_conversation now creates a unique UUID
     conv_id = await service.ensure_conversation("user2")
-    assert conv_id == "default_conv"
+    assert conv_id is not None
+    assert len(conv_id) > 0
+    # Should NOT be the old hardcoded sentinel
+    assert conv_id != "default_conv"
     await service.save_message(conv_id, "user", "Hello there")
     
-    # Make sure we don't duplicate conversation
-    conv_id2 = await service.ensure_conversation("user2")
+    # Passing the same conv_id back should return the same ID (continuation)
+    conv_id2 = await service.ensure_conversation("user2", conv_id)
     assert conv_id2 == conv_id
 
 @pytest.mark.asyncio

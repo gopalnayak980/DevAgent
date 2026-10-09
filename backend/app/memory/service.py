@@ -1,5 +1,5 @@
 import re
-from typing import List
+from typing import List, Optional
 from app.memory.repository import MemoryRepository
 from app.database.models import Memory, Conversation, Message
 
@@ -43,15 +43,32 @@ class MemoryService:
                 await self.repository.create_memory(new_memory)
                 break # Only extract one per message for simplicity
                 
-    async def ensure_conversation(self, user_id: str, conv_id: str = "default_conv") -> str:
+    async def ensure_conversation(self, user_id: str, conv_id: Optional[str] = None) -> str:
         """Ensure a conversation exists for the user. Return the conversation ID."""
-        conv = await self.repository.get_conversation(conv_id)
-        if not conv:
-            conv = Conversation(id=conv_id, user_id=user_id)
+        if conv_id:
+            conv = await self.repository.get_conversation(conv_id)
+            if not conv or conv.user_id != user_id:
+                raise ValueError("Conversation not found or access denied")
+            return conv.id
+        else:
+            import uuid
+            new_id = str(uuid.uuid4())
+            conv = Conversation(id=new_id, user_id=user_id)
             await self.repository.create_conversation(conv)
-        return conv.id
+            return conv.id
         
     async def save_message(self, conv_id: str, role: str, content: str) -> None:
         """Save a message to the conversation history."""
         msg = Message(conversation_id=conv_id, role=role, content=content)
         await self.repository.create_message(msg)
+
+    async def get_user_conversations(self, user_id: str) -> List[Conversation]:
+        """Get all conversations for a user, sorted by updated_at descending."""
+        return await self.repository.get_conversations_for_user(user_id)
+
+    async def get_conversation_messages(self, user_id: str, conv_id: str) -> List[Message]:
+        """Get messages for a conversation, verifying ownership first."""
+        conv = await self.repository.get_conversation(conv_id)
+        if not conv or conv.user_id != user_id:
+            raise ValueError("Conversation not found or access denied")
+        return await self.repository.get_messages_for_conversation(conv_id)

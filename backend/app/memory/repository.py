@@ -51,3 +51,13 @@ class MemoryRepository:
     async def get_conversation(self, conv_id: str) -> Optional[Conversation]:
         result = await self.session.execute(select(Conversation).where(Conversation.id == conv_id))
         return result.scalar_one_or_none()
+
+    async def get_conversations_for_user(self, user_id: str) -> List[Conversation]:
+        stmt = select(Conversation).where(Conversation.user_id == user_id).order_by(Conversation.updated_at.desc())
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_messages_for_conversation(self, conv_id: str) -> List[Message]:
+        stmt = select(Message).where(Message.conversation_id == conv_id).order_by(Message.created_at.asc())
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

@@ -27,6 +27,7 @@ client = TestClient(app)
 # Calculator — safe_calculate() unit tests
 # ===========================================================================
 
+
 class TestCalculatorAddition:
     """Test calculator addition operations."""
 
@@ -161,31 +162,42 @@ class TestCalculatorDangerousExpressions:
 # CalculatorTool — execute() via the tool interface
 # ===========================================================================
 
+
 class TestCalculatorToolExecute:
     """Test the CalculatorTool wrapper."""
 
     def test_tool_metadata(self):
         tool = CalculatorTool()
+
         assert tool.name == "calculator"
-        assert "expression" in tool.description.lower() or "math" in tool.description.lower()
+        assert (
+            "expression" in tool.description.lower()
+            or "math" in tool.description.lower()
+        )
         assert "expression" in str(tool.input_schema)
 
     def test_successful_execution(self):
         tool = CalculatorTool()
+
         result = tool.execute("25 * 4")
+
         assert result.success is True
         assert result.result == "100"
         assert result.tool_name == "calculator"
 
     def test_failed_execution(self):
         tool = CalculatorTool()
+
         result = tool.execute("invalid expression here")
+
         assert result.success is False
         assert result.tool_name == "calculator"
 
     def test_division_by_zero_returns_failure(self):
         tool = CalculatorTool()
+
         result = tool.execute("5 / 0")
+
         assert result.success is False
         assert "zero" in result.result.lower()
 
@@ -194,35 +206,45 @@ class TestCalculatorToolExecute:
 # ToolRegistry
 # ===========================================================================
 
+
 class TestToolRegistry:
     """Test the ToolRegistry operations."""
 
     def test_register_and_get(self):
         reg = ToolRegistry()
         tool = CalculatorTool()
+
         reg.register(tool)
+
         assert reg.get("calculator") is tool
 
     def test_get_nonexistent_returns_none(self):
         reg = ToolRegistry()
+
         assert reg.get("nonexistent") is None
 
     def test_list_tools(self):
         reg = ToolRegistry()
+
         reg.register(CalculatorTool())
+
         tools = reg.list_tools()
+
         assert len(tools) == 1
         assert tools[0]["name"] == "calculator"
         assert "description" in tools[0]
 
     def test_duplicate_registration_raises(self):
         reg = ToolRegistry()
+
         reg.register(CalculatorTool())
+
         with pytest.raises(ValueError, match="already registered"):
             reg.register(CalculatorTool())
 
     def test_list_tools_empty_registry(self):
         reg = ToolRegistry()
+
         assert reg.list_tools() == []
 
 
@@ -232,7 +254,9 @@ class TestGlobalRegistry:
     def test_calculator_in_global_registry(self):
         # The import of app.main triggers tool registration
         registry = get_registry()
+
         calc = registry.get("calculator")
+
         assert calc is not None
         assert calc.name == "calculator"
 
@@ -242,9 +266,13 @@ class TestCalculatorThroughRegistry:
 
     def test_invoke_via_registry(self):
         registry = get_registry()
+
         tool = registry.get("calculator")
+
         assert tool is not None
+
         result = tool.execute("125 / 5")
+
         assert result.success is True
         assert result.result == "25"
 
@@ -253,29 +281,48 @@ class TestCalculatorThroughRegistry:
 # Tool Decision Service
 # ===========================================================================
 
+
 class TestExtractCalculatorExpression:
     """Test the expression extraction regex."""
 
     def test_calculate_prefix(self):
-        assert _extract_calculator_expression("Calculate 25 * 4") == "25 * 4"
+        assert (
+            _extract_calculator_expression("Calculate 25 * 4")
+            == "25 * 4"
+        )
 
     def test_compute_prefix(self):
-        assert _extract_calculator_expression("Compute 10 + 20") == "10 + 20"
+        assert (
+            _extract_calculator_expression("Compute 10 + 20")
+            == "10 + 20"
+        )
 
     def test_what_is_pattern(self):
-        assert _extract_calculator_expression("What is 125 * 48?") == "125 * 48"
+        assert (
+            _extract_calculator_expression("What is 125 * 48?")
+            == "125 * 48"
+        )
 
     def test_how_much_pattern(self):
-        assert _extract_calculator_expression("How much is 3 + 5?") == "3 + 5"
+        assert (
+            _extract_calculator_expression("How much is 3 + 5?")
+            == "3 + 5"
+        )
 
     def test_pure_math(self):
         assert _extract_calculator_expression("25 * 4") == "25 * 4"
 
     def test_non_math_returns_none(self):
-        assert _extract_calculator_expression("Explain Java inheritance") is None
+        assert (
+            _extract_calculator_expression("Explain Java inheritance")
+            is None
+        )
 
     def test_plain_text_returns_none(self):
-        assert _extract_calculator_expression("Hello, how are you?") is None
+        assert (
+            _extract_calculator_expression("Hello, how are you?")
+            is None
+        )
 
 
 class TestDecideTool:
@@ -284,6 +331,7 @@ class TestDecideTool:
     @pytest.mark.asyncio
     async def test_calculator_needed(self):
         decision = await decide_tool("What is 125 * 48?")
+
         assert decision.tool_needed is True
         assert decision.tool_name == "calculator"
         assert decision.tool_result is not None
@@ -293,23 +341,31 @@ class TestDecideTool:
     @pytest.mark.asyncio
     async def test_no_tool_for_general(self):
         decision = await decide_tool("Explain Java inheritance")
+
         assert decision.tool_needed is False
         assert decision.tool_name is None
         assert decision.tool_result is None
 
     @pytest.mark.asyncio
     async def test_no_tool_for_coding(self):
-        decision = await decide_tool("Write a Python function to sort a list")
+        decision = await decide_tool(
+            "Write a Python function to sort a list"
+        )
+
         assert decision.tool_needed is False
 
     @pytest.mark.asyncio
     async def test_no_tool_for_debugging(self):
-        decision = await decide_tool("Fix this TypeError in my code")
+        decision = await decide_tool(
+            "Fix this TypeError in my code"
+        )
+
         assert decision.tool_needed is False
 
     @pytest.mark.asyncio
     async def test_pure_math_expression(self):
         decision = await decide_tool("25 * 4")
+
         assert decision.tool_needed is True
         assert decision.tool_result.result == "100"
 
@@ -317,6 +373,7 @@ class TestDecideTool:
 # ===========================================================================
 # Integration: existing agents still work
 # ===========================================================================
+
 
 class TestExistingAgentsStillWork:
     """Verify Phase 3 agents are unaffected by Phase 4 changes."""
@@ -327,8 +384,18 @@ class TestExistingAgentsStillWork:
         from app.schemas.supervisor import SupervisorDecision
 
         agent = CodingAgent()
-        decision = SupervisorDecision(intent="coding", complexity="simple", plan=["Write code"])
-        result = await agent.handle("Write a loop", decision)
+
+        decision = SupervisorDecision(
+            intent="coding",
+            complexity="simple",
+            plan=["Write code"],
+        )
+
+        result = await agent.handle(
+            "Write a loop",
+            decision,
+        )
+
         assert result.agent_name == "CodingAgent"
         assert "Coding Specialist" in result.system_prompt
 
@@ -338,8 +405,18 @@ class TestExistingAgentsStillWork:
         from app.schemas.supervisor import SupervisorDecision
 
         agent = DebuggingAgent()
-        decision = SupervisorDecision(intent="debugging", complexity="moderate", plan=["Debug"])
-        result = await agent.handle("Fix this error", decision)
+
+        decision = SupervisorDecision(
+            intent="debugging",
+            complexity="moderate",
+            plan=["Debug"],
+        )
+
+        result = await agent.handle(
+            "Fix this error",
+            decision,
+        )
+
         assert result.agent_name == "DebuggingAgent"
         assert "Debugging Specialist" in result.system_prompt
 
@@ -349,8 +426,18 @@ class TestExistingAgentsStillWork:
         from app.schemas.supervisor import SupervisorDecision
 
         agent = StudyAgent()
-        decision = SupervisorDecision(intent="learning", complexity="complex", plan=["Explain"])
-        result = await agent.handle("What is polymorphism?", decision)
+
+        decision = SupervisorDecision(
+            intent="learning",
+            complexity="complex",
+            plan=["Explain"],
+        )
+
+        result = await agent.handle(
+            "What is polymorphism?",
+            decision,
+        )
+
         assert result.agent_name == "StudyAgent"
         assert "Study & Learning Specialist" in result.system_prompt
 
@@ -359,12 +446,17 @@ class TestExistingAgentsStillWork:
 # Integration: /api/chat still works end-to-end
 # ===========================================================================
 
+
 class TestChatWithToolIntegration:
     """Verify /api/chat behavior with Phase 4 tool calling."""
 
-    @patch("app.routes.chat.get_llm_response_with_prompts", new_callable=AsyncMock)
+    @patch(
+        "app.routes.chat.get_llm_response_with_prompts",
+        new_callable=AsyncMock,
+    )
     def test_non_tool_request_works(self, mock_llm):
         """A regular coding request still flows through the normal path."""
+
         mock_llm.return_value = "Here is a function."
 
         response = client.post(
@@ -373,13 +465,19 @@ class TestChatWithToolIntegration:
         )
 
         assert response.status_code == 200
+
         data = response.json()
+
         assert data["response"] == "Here is a function."
         assert "response" in data
 
-    @patch("app.routes.chat.get_llm_response", new_callable=AsyncMock)
+    @patch(
+        "app.routes.chat.get_llm_response",
+        new_callable=AsyncMock,
+    )
     def test_calculator_request_enriches_prompt(self, mock_llm):
         """A calculator request appends the tool result to the user prompt."""
+
         mock_llm.return_value = "The result of 25 * 4 is 100."
 
         response = client.post(
@@ -388,20 +486,32 @@ class TestChatWithToolIntegration:
         )
 
         assert response.status_code == 200
+
         data = response.json()
+
         assert data["response"] == "The result of 25 * 4 is 100."
 
         # Verify the prompt was enriched with tool result.
         # "Calculate 25 * 4" is general intent → get_llm_response is called
         # with the enriched message as the first positional arg.
         call_args = mock_llm.call_args
-        enriched_message = call_args.args[0] if call_args.args else call_args.kwargs.get("user_message", "")
+
+        enriched_message = (
+            call_args.args[0]
+            if call_args.args
+            else call_args.kwargs.get("user_message", "")
+        )
+
         assert "Tool Result" in enriched_message
         assert "100" in enriched_message
 
-    @patch("app.routes.chat.get_llm_response", new_callable=AsyncMock)
+    @patch(
+        "app.routes.chat.get_llm_response",
+        new_callable=AsyncMock,
+    )
     def test_general_non_tool_request(self, mock_llm):
         """A general non-tool request still uses the fallback LLM path."""
+
         mock_llm.return_value = "Hello!"
 
         response = client.post(
@@ -410,22 +520,45 @@ class TestChatWithToolIntegration:
         )
 
         assert response.status_code == 200
+
         data = response.json()
+
         assert data["response"] == "Hello!"
 
     def test_empty_message_still_returns_422(self):
         """Empty message validation is unchanged."""
-        response = client.post("/api/chat", json={"message": ""})
+
+        response = client.post(
+            "/api/chat",
+            json={"message": ""},
+        )
+
         assert response.status_code == 422
 
     def test_response_format_unchanged(self):
         """The response format remains { 'response': '...' } with new HITL fields."""
-        with patch("app.routes.chat.get_llm_response_with_prompts", new_callable=AsyncMock) as mock_llm:
+
+        with patch(
+            "app.routes.chat.get_llm_response_with_prompts",
+            new_callable=AsyncMock,
+        ) as mock_llm:
+
             mock_llm.return_value = "Test response"
+
+            # Use a unique IP so this test does not inherit
+            # rate-limit state from earlier tests in the full suite.
+            headers = {
+                "X-Forwarded-For": "192.168.1.100"
+            }
+
             response = client.post(
                 "/api/chat",
                 json={"message": "Write code to print hello"},
+                headers=headers,
             )
+
             data = response.json()
+
+            assert response.status_code == 200
             assert "response" in data
             assert data.get("requires_approval", False) is False

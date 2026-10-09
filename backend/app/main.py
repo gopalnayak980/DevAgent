@@ -74,3 +74,11 @@ async def root():
         "version": "0.10.1",
         "phase": 10.1,
     }
+
+@app.get("/api/health")
+async def health_check():
+    """Phase 10.3: Backend health check endpoint."""
+    return {
+        "status": "ok",
+        "service": "DevAgent backend"
+    }

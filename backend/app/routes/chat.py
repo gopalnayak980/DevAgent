@@ -27,7 +27,7 @@ from app.config import settings
 from app.database.session import get_db
 from app.database.models import User
 from app.auth.dependencies import get_current_active_user
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import ChatRequest, ChatResponse, ConversationResponse, MessageResponse
 from app.agents.supervisor import analyze as supervisor_analyze
 from app.agents.router import get_agent_for_intent
 from app.services.llm_service import get_llm_response, get_llm_response_with_prompts
@@ -126,6 +126,7 @@ async def chat(
             ),
             requires_approval=True,
             approval=ApprovalResponse.model_validate(approval),
+            conversation_id=request.conversation_id,
         )
 
     # ------------------------------------------------------------------
@@ -149,7 +150,10 @@ async def chat(
     memory_service = MemoryService(memory_repo)
     
     # Ensure conversation and extract new memory
-    conv_id = await memory_service.ensure_conversation(user_id)
+    try:
+        conv_id = await memory_service.ensure_conversation(user_id, request.conversation_id)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Conversation not found or access denied")
     await memory_service.save_message(conv_id, "user", message)
     await memory_service.extract_and_save_memory(user_id, message)
 
@@ -274,7 +278,7 @@ async def chat(
             except Exception as exc:
                 logger.warning("Failed to complete observability trace: %s", exc)
 
-        return HITLChatResponse(response=response_text)
+        return HITLChatResponse(response=response_text, conversation_id=conv_id)
 
     except TimeoutError:
         logger.error("LLM request timed out.")
@@ -314,3 +318,44 @@ async def chat(
             status_code=500,
             detail="An unexpected error occurred. Please try again.",
         )
+
+@router.get("/conversations", response_model=list[ConversationResponse])
+async def list_conversations(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """List all conversations for the authenticated user."""
+    memory_repo = MemoryRepository(session)
+    memory_service = MemoryService(memory_repo)
+    
+    conversations = await memory_service.get_user_conversations(current_user.id)
+    
+    # Format the response since Conversation doesn't have a title field yet
+    result = []
+    for conv in conversations:
+        result.append(
+            ConversationResponse(
+                id=conv.id,
+                title=f"Chat {conv.created_at.strftime('%b %d, %Y')}",
+                created_at=conv.created_at,
+                updated_at=conv.updated_at
+            )
+        )
+    return result
+
+@router.get("/conversations/{conversation_id}/messages", response_model=list[MessageResponse])
+async def get_conversation_messages(
+    conversation_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all messages for a specific conversation."""
+    memory_repo = MemoryRepository(session)
+    memory_service = MemoryService(memory_repo)
+    
+    try:
+        messages = await memory_service.get_conversation_messages(current_user.id, conversation_id)
+        return messages
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Conversation not found or access denied")
+
