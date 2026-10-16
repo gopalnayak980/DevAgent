@@ -14,6 +14,7 @@ from app.routes.approvals import router as approvals_router
 from app.routes.jobs import router as jobs_router
 from app.routes.observability import router as observability_router
 from app.routes.auth import router as auth_router
+from app.routes.workspaces import router as workspaces_router
 from app.tools.calculator import CalculatorTool
 from app.tools.registry import get_registry
 from app.middleware.security_headers import SecurityHeadersMiddleware
@@ -57,6 +58,7 @@ app.include_router(chat_router)
 app.include_router(approvals_router)
 app.include_router(jobs_router)
 app.include_router(observability_router)
+app.include_router(workspaces_router)
 
 # ---------------------------------------------------------------------------
 # Phase 4 — Register tools at startup

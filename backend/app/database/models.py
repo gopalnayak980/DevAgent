@@ -118,3 +118,18 @@ class ExecutionTrace(Base):
         """Serialize a list of tool names to JSON string."""
         self.tools_used = json.dumps(tools)
 
+
+class Workspace(Base):
+    """Phase 11 — User-owned project workspace."""
+    __tablename__ = "workspaces"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_workspace_user_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    root_path: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

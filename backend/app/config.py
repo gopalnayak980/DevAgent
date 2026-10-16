@@ -72,6 +72,12 @@ class Settings:
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
+    # -----------------------------------------------------------------------
+    # Phase 11 — Workspace settings
+    # -----------------------------------------------------------------------
+
+    WORKSPACE_ROOT_DIR: str = os.getenv("WORKSPACE_ROOT_DIR", os.path.join(os.getcwd(), "workspaces"))
+
 
 # Singleton settings instance
 settings = Settings()

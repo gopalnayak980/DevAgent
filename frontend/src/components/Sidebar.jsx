@@ -1,4 +1,15 @@
-import { Home, MessageSquare, Zap, ShieldCheck, BrainCircuit, Activity, Settings, Plus, MessageCircle } from "lucide-react";
+import {
+  Home,
+  MessageSquare,
+  Zap,
+  ShieldCheck,
+  BrainCircuit,
+  Activity,
+  Settings,
+  Plus,
+  MessageCircle,
+} from "lucide-react";
+import WorkspaceSection from "./WorkspaceSection.jsx";
 
 export default function Sidebar({
   activeView,
@@ -8,6 +19,16 @@ export default function Sidebar({
   isConvsLoading,
   onNewChat,
   onSelectConversation,
+  // Workspace props
+  workspaces = [],
+  activeWorkspaceId,
+  isWorkspacesLoading,
+  workspacesError,
+  onSelectWorkspace,
+  isWorkspaceModalOpen,
+  onOpenWorkspaceModal,
+  onCloseWorkspaceModal,
+  onWorkspaceCreated,
 }) {
   const navItems = [
     { id: "home", label: "Dashboard", icon: <Home size={20} /> },
@@ -32,7 +53,13 @@ export default function Sidebar({
         {navItems.map((item) => (
           <button
             key={item.id}
-            className={`sidebar-nav-btn ${activeView === item.id && item.id !== "chat" ? "active" : ""} ${activeView === "chat" && item.id === "chat" && !activeConversationId ? "active" : ""}`}
+            className={`sidebar-nav-btn ${
+              activeView === item.id && item.id !== "chat" ? "active" : ""
+            } ${
+              activeView === "chat" && item.id === "chat" && !activeConversationId
+                ? "active"
+                : ""
+            }`}
             onClick={() => setActiveView(item.id)}
             title={item.label}
           >
@@ -54,7 +81,9 @@ export default function Sidebar({
               conversations.map((conv) => (
                 <button
                   key={conv.id}
-                  className={`conv-history-btn ${activeConversationId === conv.id ? "active" : ""}`}
+                  className={`conv-history-btn ${
+                    activeConversationId === conv.id ? "active" : ""
+                  }`}
                   onClick={() => onSelectConversation(conv.id)}
                   title={conv.title}
                 >
@@ -69,6 +98,19 @@ export default function Sidebar({
             )}
           </div>
         )}
+
+        {/* Workspace Section */}
+        <WorkspaceSection
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          isWorkspacesLoading={isWorkspacesLoading}
+          workspacesError={workspacesError}
+          onSelectWorkspace={onSelectWorkspace}
+          isModalOpen={isWorkspaceModalOpen}
+          onOpenModal={onOpenWorkspaceModal}
+          onCloseModal={onCloseWorkspaceModal}
+          onWorkspaceCreated={onWorkspaceCreated}
+        />
       </nav>
 
       <div className="sidebar-footer">
@@ -87,7 +129,9 @@ export default function Sidebar({
           onClick={() => setActiveView("settings")}
           title="Settings"
         >
-          <span className="sidebar-nav-icon"><Settings size={20} /></span>
+          <span className="sidebar-nav-icon">
+            <Settings size={20} />
+          </span>
           <span className="sidebar-nav-label">Settings</span>
         </button>
       </div>

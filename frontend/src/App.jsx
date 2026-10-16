@@ -9,6 +9,8 @@ import Observability from "./components/Observability.jsx";
 import ApprovalsPanel from "./components/ApprovalsPanel.jsx";
 import MemoryPanel from "./components/MemoryPanel.jsx";
 import AuthPage from "./components/AuthPage.jsx";
+import WorkspaceFileExplorer from "./components/WorkspaceFileExplorer.jsx";
+import { FolderOpen, MessageSquare, FileCode, Columns } from "lucide-react";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
 export default function App() {
@@ -22,6 +24,14 @@ export default function App() {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [isConvsLoading, setIsConvsLoading] = useState(false);
+
+  // Workspace state
+  const [workspaces, setWorkspaces] = useState([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
+  const [isWorkspacesLoading, setIsWorkspacesLoading] = useState(false);
+  const [workspacesError, setWorkspacesError] = useState(null);
+  const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
+  const [chatWorkspaceMode, setChatWorkspaceMode] = useState("split");
 
   // Fetch conversation list from backend
   const fetchConversations = useCallback(async () => {
@@ -46,6 +56,47 @@ export default function App() {
       fetchConversations();
     }
   }, [user, fetchConversations]);
+
+  // Fetch workspace list from backend
+  const fetchWorkspaces = useCallback(async () => {
+    if (!user) return;
+    setIsWorkspacesLoading(true);
+    setWorkspacesError(null);
+    try {
+      const res = await authFetch("/api/workspaces");
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaces(data.workspaces || []);
+      } else if (res.status === 401) {
+        setWorkspacesError("Session expired. Please log in again.");
+      } else {
+        setWorkspacesError("Failed to load workspaces.");
+      }
+    } catch (err) {
+      console.error("Failed to load workspaces:", err);
+      setWorkspacesError("Unable to connect to the server.");
+    } finally {
+      setIsWorkspacesLoading(false);
+    }
+  }, [user, authFetch]);
+
+  // Load workspaces when the user is authenticated
+  useEffect(() => {
+    if (user) {
+      fetchWorkspaces();
+    }
+  }, [user, fetchWorkspaces]);
+
+  const handleWorkspaceCreated = useCallback((newWorkspace) => {
+    setWorkspaces((prev) => [newWorkspace, ...prev]);
+    setActiveWorkspaceId(newWorkspace.id);
+    setActiveView("chat");
+  }, []);
+
+  const handleSelectWorkspace = useCallback((wsId) => {
+    setActiveWorkspaceId((prev) => (prev === wsId ? null : wsId));
+    setActiveView("chat");
+  }, []);
 
   // Load messages for a selected conversation
   const loadConversation = useCallback(
@@ -199,19 +250,77 @@ export default function App() {
     switch (activeView) {
       case "home":
         return <DashboardHome setActiveView={setActiveView} />;
-      case "chat":
+      case "chat": {
+        const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || null;
         return (
           <div className="chat-view">
-            <ChatWindow
-              messages={messages}
-              isLoading={isChatLoading}
-              error={chatError}
-              onHintClick={handleHintClick}
-              onApprovalAction={handleApprovalAction}
-            />
-            <ChatInput onSend={sendMessage} isLoading={isChatLoading} />
+            {activeWorkspace && (
+              <div className="chat-workspace-header">
+                <div className="chat-ws-title">
+                  <FolderOpen size={15} />
+                  <span>
+                    Workspace: <strong>{activeWorkspace.name}</strong>
+                  </span>
+                </div>
+                <div className="chat-ws-mode-tabs" role="tablist" aria-label="Workspace view modes">
+                  <button
+                    className={`chat-ws-tab-btn ${chatWorkspaceMode === "chat" ? "active" : ""}`}
+                    onClick={() => setChatWorkspaceMode("chat")}
+                    title="Full Chat view"
+                    role="tab"
+                    aria-selected={chatWorkspaceMode === "chat"}
+                  >
+                    <MessageSquare size={13} />
+                    <span>Chat</span>
+                  </button>
+                  <button
+                    className={`chat-ws-tab-btn ${chatWorkspaceMode === "files" ? "active" : ""}`}
+                    onClick={() => setChatWorkspaceMode("files")}
+                    title="Full Files & Code view"
+                    role="tab"
+                    aria-selected={chatWorkspaceMode === "files"}
+                  >
+                    <FileCode size={13} />
+                    <span>Files & Code</span>
+                  </button>
+                  <button
+                    className={`chat-ws-tab-btn ${chatWorkspaceMode === "split" ? "active" : ""}`}
+                    onClick={() => setChatWorkspaceMode("split")}
+                    title="Side-by-side Split view"
+                    role="tab"
+                    aria-selected={chatWorkspaceMode === "split"}
+                  >
+                    <Columns size={13} />
+                    <span>Split View</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={`chat-workspace-body ${activeWorkspace ? `mode-${chatWorkspaceMode}` : ""}`}>
+              {(chatWorkspaceMode === "chat" || chatWorkspaceMode === "split" || !activeWorkspace) && (
+                <div className="chat-main-column">
+                  <ChatWindow
+                    messages={messages}
+                    isLoading={isChatLoading}
+                    error={chatError}
+                    onHintClick={handleHintClick}
+                    onApprovalAction={handleApprovalAction}
+                    activeWorkspace={activeWorkspace}
+                  />
+                  <ChatInput onSend={sendMessage} isLoading={isChatLoading} />
+                </div>
+              )}
+
+              {activeWorkspace && (chatWorkspaceMode === "files" || chatWorkspaceMode === "split") && (
+                <div className="chat-explorer-column">
+                  <WorkspaceFileExplorer workspace={activeWorkspace} authFetch={authFetch} />
+                </div>
+              )}
+            </div>
           </div>
         );
+      }
       case "jobs":
         return <BackgroundJobs />;
       case "approvals":
@@ -263,6 +372,15 @@ export default function App() {
       isConvsLoading={isConvsLoading}
       onNewChat={handleNewChat}
       onSelectConversation={loadConversation}
+      workspaces={workspaces}
+      activeWorkspaceId={activeWorkspaceId}
+      isWorkspacesLoading={isWorkspacesLoading}
+      workspacesError={workspacesError}
+      onSelectWorkspace={handleSelectWorkspace}
+      isWorkspaceModalOpen={isWorkspaceModalOpen}
+      onOpenWorkspaceModal={() => setIsWorkspaceModalOpen(true)}
+      onCloseWorkspaceModal={() => setIsWorkspaceModalOpen(false)}
+      onWorkspaceCreated={handleWorkspaceCreated}
     >
       {renderActiveView()}
     </DashboardLayout>

@@ -12,7 +12,19 @@ export default function DashboardLayout({
   isConvsLoading,
   onNewChat,
   onSelectConversation,
+  // Workspace props
+  workspaces,
+  activeWorkspaceId,
+  isWorkspacesLoading,
+  workspacesError,
+  onSelectWorkspace,
+  isWorkspaceModalOpen,
+  onOpenWorkspaceModal,
+  onCloseWorkspaceModal,
+  onWorkspaceCreated,
 }) {
+  const activeWorkspace = workspaces?.find((w) => w.id === activeWorkspaceId) || null;
+
   return (
     <div className="dashboard-layout">
       <Sidebar
@@ -23,9 +35,23 @@ export default function DashboardLayout({
         isConvsLoading={isConvsLoading}
         onNewChat={onNewChat}
         onSelectConversation={onSelectConversation}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        isWorkspacesLoading={isWorkspacesLoading}
+        workspacesError={workspacesError}
+        onSelectWorkspace={onSelectWorkspace}
+        isWorkspaceModalOpen={isWorkspaceModalOpen}
+        onOpenWorkspaceModal={onOpenWorkspaceModal}
+        onCloseWorkspaceModal={onCloseWorkspaceModal}
+        onWorkspaceCreated={onWorkspaceCreated}
       />
       <div className="dashboard-main">
-        <Topbar activeView={activeView} user={user} logout={logout} />
+        <Topbar
+          activeView={activeView}
+          user={user}
+          logout={logout}
+          activeWorkspace={activeWorkspace}
+        />
         <div className="dashboard-content">
           {children}
         </div>

@@ -10,7 +10,7 @@ const SUGGESTIONS = [
   { title: "Review my code", desc: "Check for best practices", icon: <Shield size={24} /> },
 ];
 
-export default function ChatWindow({ messages, isLoading, error, onHintClick, onApprovalAction }) {
+export default function ChatWindow({ messages, isLoading, error, onHintClick, onApprovalAction, activeWorkspace }) {
   const bottomRef = useRef(null);
 
   // Auto-scroll to the latest message
