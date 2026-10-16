@@ -4,11 +4,13 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.database.models import Base, User
 from app.database.session import get_db
 from app.auth.dependencies import get_current_active_user, require_admin
+from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.main import app
 from typing import AsyncGenerator
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def setup_test_db() -> AsyncGenerator[AsyncSession, None]:
+    RateLimiterMiddleware.reset_all()
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

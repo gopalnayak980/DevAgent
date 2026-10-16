@@ -13,6 +13,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from typing import Optional
+
 from app.database.session import get_db
 from app.database.models import User
 from app.auth.dependencies import get_current_active_user
@@ -32,6 +34,15 @@ from app.workspace.file_service import (
     FileTooLargeError,
     FileEncodingError,
 )
+from app.workspace.change_repository import FileChangeProposalRepository
+from app.workspace.change_service import (
+    FileChangeProposalService,
+    ProposalNotFoundError,
+    ProposalAccessDeniedError,
+    ProposalStatusError,
+    StaleFileError,
+    ProposalExecutionError,
+)
 from app.workspace.schemas import (
     WorkspaceCreateRequest,
     WorkspaceResponse,
@@ -39,9 +50,13 @@ from app.workspace.schemas import (
     FileListResponse,
     FileContentResponse,
     FileEntry,
+    FileChangeProposalCreateRequest,
+    FileChangeProposalResponse,
+    FileChangeProposalListResponse,
 )
 
 logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api", tags=["workspaces"])
 
@@ -228,3 +243,236 @@ async def get_workspace(
         )
 
     return WorkspaceResponse.model_validate(workspace)
+
+
+def _get_change_service(session: AsyncSession) -> FileChangeProposalService:
+    """Build the change service with its repository from the injected session."""
+    return FileChangeProposalService(FileChangeProposalRepository(session))
+
+
+# ---------------------------------------------------------------------------
+# Phase 11.4 — File Change Proposals (PROPOSE → DIFF → APPROVAL → APPLY)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/workspaces/{workspace_id}/changes",
+    response_model=FileChangeProposalResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_change_proposal(
+    workspace_id: str,
+    request: FileChangeProposalCreateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Propose a modification to a workspace file.
+
+    Generates an exact unified diff and persists the proposal with status 'pending'.
+    Does NOT modify the file on disk.
+    """
+    ws_service = _get_service(session)
+    try:
+        workspace = await ws_service.get_workspace(
+            workspace_id=workspace_id,
+            user_id=current_user.id,
+        )
+    except (WorkspaceNotFoundError, WorkspaceAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace '{workspace_id}' not found.",
+        )
+
+    change_service = _get_change_service(session)
+    try:
+        proposal = await change_service.create_proposal(
+            workspace=workspace,
+            user_id=current_user.id,
+            file_path=request.file_path,
+            proposed_content=request.proposed_content,
+        )
+    except PathTraversalError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except IsADirectoryError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except FileNotFoundInWorkspaceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except FileTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
+        )
+    except FileEncodingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        )
+    except ProposalAccessDeniedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
+    return FileChangeProposalResponse.model_validate(proposal)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/changes",
+    response_model=FileChangeProposalListResponse,
+)
+async def list_change_proposals(
+    workspace_id: str,
+    proposal_status: Optional[str] = Query(None, alias="status", description="Filter by status (pending, applied, rejected, failed)."),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List file change proposals in this workspace owned by current user."""
+    ws_service = _get_service(session)
+    try:
+        workspace = await ws_service.get_workspace(
+            workspace_id=workspace_id,
+            user_id=current_user.id,
+        )
+    except (WorkspaceNotFoundError, WorkspaceAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace '{workspace_id}' not found.",
+        )
+
+    change_service = _get_change_service(session)
+    proposals = await change_service.list_proposals(
+        workspace=workspace,
+        user_id=current_user.id,
+        status=proposal_status,
+    )
+    return FileChangeProposalListResponse(
+        proposals=[FileChangeProposalResponse.model_validate(p) for p in proposals],
+        total=len(proposals),
+    )
+
+
+@router.get(
+    "/workspaces/{workspace_id}/changes/{proposal_id}",
+    response_model=FileChangeProposalResponse,
+)
+async def get_change_proposal(
+    workspace_id: str,
+    proposal_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a single file change proposal with its exact unified diff."""
+    ws_service = _get_service(session)
+    try:
+        workspace = await ws_service.get_workspace(
+            workspace_id=workspace_id,
+            user_id=current_user.id,
+        )
+    except (WorkspaceNotFoundError, WorkspaceAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace '{workspace_id}' not found.",
+        )
+
+    change_service = _get_change_service(session)
+    try:
+        proposal = await change_service.get_proposal(
+            workspace=workspace,
+            user_id=current_user.id,
+            proposal_id=proposal_id,
+        )
+    except (ProposalNotFoundError, ProposalAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{proposal_id}' not found.",
+        )
+
+    return FileChangeProposalResponse.model_validate(proposal)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/changes/{proposal_id}/approve",
+    response_model=FileChangeProposalResponse,
+)
+async def approve_change_proposal(
+    workspace_id: str,
+    proposal_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Approve and apply a pending proposal.
+
+    Verifies ownership, status, and that current file hash matches original hash.
+    Atomically writes proposed content to the file.
+    """
+    ws_service = _get_service(session)
+    try:
+        workspace = await ws_service.get_workspace(
+            workspace_id=workspace_id,
+            user_id=current_user.id,
+        )
+    except (WorkspaceNotFoundError, WorkspaceAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace '{workspace_id}' not found.",
+        )
+
+    change_service = _get_change_service(session)
+    try:
+        proposal = await change_service.approve_and_apply_proposal(
+            workspace=workspace,
+            user_id=current_user.id,
+            proposal_id=proposal_id,
+        )
+    except (ProposalNotFoundError, ProposalAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{proposal_id}' not found.",
+        )
+    except ProposalStatusError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except StaleFileError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ProposalExecutionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
+        )
+
+    return FileChangeProposalResponse.model_validate(proposal)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/changes/{proposal_id}/reject",
+    response_model=FileChangeProposalResponse,
+)
+async def reject_change_proposal(
+    workspace_id: str,
+    proposal_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Explicitly reject a pending proposal. Files are NOT modified."""
+    ws_service = _get_service(session)
+    try:
+        workspace = await ws_service.get_workspace(
+            workspace_id=workspace_id,
+            user_id=current_user.id,
+        )
+    except (WorkspaceNotFoundError, WorkspaceAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workspace '{workspace_id}' not found.",
+        )
+
+    change_service = _get_change_service(session)
+    try:
+        proposal = await change_service.reject_proposal(
+            workspace=workspace,
+            user_id=current_user.id,
+            proposal_id=proposal_id,
+        )
+    except (ProposalNotFoundError, ProposalAccessDeniedError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{proposal_id}' not found.",
+        )
+    except ProposalStatusError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return FileChangeProposalResponse.model_validate(proposal)
+

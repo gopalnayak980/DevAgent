@@ -39,10 +39,19 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     Not suitable for production multi-process deployments.
     """
 
+    _instances: list["RateLimiterMiddleware"] = []
+
     def __init__(self, app):
         super().__init__(app)
         # {ip_address: [timestamp, timestamp, ...]}
         self._requests: dict[str, list[float]] = defaultdict(list)
+        RateLimiterMiddleware._instances.append(self)
+
+    @classmethod
+    def reset_all(cls) -> None:
+        """Reset rate limiter state across all instances (useful in tests)."""
+        for instance in cls._instances:
+            instance._requests.clear()
 
     def _clean_old_requests(self, ip: str, now: float) -> None:
         """Remove timestamps outside the current window."""

@@ -133,3 +133,24 @@ class Workspace(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class FileChangeProposal(Base):
+    """Phase 11.4 — Safe file modification proposal with human approval."""
+    __tablename__ = "file_change_proposals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    workspace_id: Mapped[str] = mapped_column(String, ForeignKey("workspaces.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), index=True, nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    original_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    proposed_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    original_content: Mapped[str] = mapped_column(Text, nullable=False)
+    proposed_content: Mapped[str] = mapped_column(Text, nullable=False)
+    diff: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+

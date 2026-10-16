@@ -83,3 +83,53 @@ class FileContentResponse(BaseModel):
     content: str = Field(..., description="UTF-8 text content of the file.")
     size: int = Field(..., description="File size in bytes.")
     language: str = Field(..., description="Detected programming/markup language.")
+
+
+# ---------------------------------------------------------------------------
+# Phase 11.4 — Safe File Modification + Human Approval Schemas
+# ---------------------------------------------------------------------------
+
+
+class FileChangeProposalCreateRequest(BaseModel):
+    """Request body to propose a file change."""
+
+    file_path: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Workspace-relative file path (e.g. 'src/App.jsx').",
+    )
+    proposed_content: str = Field(
+        ...,
+        description="Complete proposed UTF-8 text content for the file.",
+    )
+
+
+class FileChangeProposalResponse(BaseModel):
+    """Details of a file change proposal."""
+
+    id: str = Field(..., description="Unique proposal identifier.")
+    workspace_id: str = Field(..., description="Workspace identifier.")
+    user_id: str = Field(..., description="Owner's user identifier.")
+    file_path: str = Field(..., description="Workspace-relative file path.")
+    original_content_hash: str = Field(..., description="SHA-256 hash of original file content.")
+    proposed_content_hash: str = Field(..., description="SHA-256 hash of proposed file content.")
+    original_content: str = Field(..., description="Original file content when proposal was created.")
+    proposed_content: str = Field(..., description="Proposed file content.")
+    diff: str = Field(..., description="Exact unified diff representation.")
+    status: str = Field(..., description="Proposal status: pending, approved, rejected, applied, failed, cancelled.")
+    created_at: datetime = Field(..., description="When the proposal was created.")
+    updated_at: datetime = Field(..., description="When the proposal was last updated.")
+    approved_at: datetime | None = Field(None, description="When the proposal was approved.")
+    rejected_at: datetime | None = Field(None, description="When the proposal was rejected.")
+    applied_at: datetime | None = Field(None, description="When the proposal was applied to disk.")
+
+    model_config = {"from_attributes": True}
+
+
+class FileChangeProposalListResponse(BaseModel):
+    """List of file change proposals."""
+
+    proposals: list[FileChangeProposalResponse] = Field(..., description="List of proposals.")
+    total: int = Field(..., description="Total count.")
+

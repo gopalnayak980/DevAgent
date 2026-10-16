@@ -17,6 +17,10 @@ class ChatRequest(BaseModel):
         default=None,
         description="Optional ID of an existing conversation.",
     )
+    workspace_id: Optional[str] = Field(
+        default=None,
+        description="Optional workspace ID for file modification requests.",
+    )
 
 class ChatResponse(BaseModel):
     """AI-generated response returned to the user."""

@@ -15,6 +15,11 @@ created and returned — the action is NOT executed until approved.
 Phase 8: Each chat request is traced for observability — agent,
 intent, complexity, LLM calls, tool usage, duration, and status.
 Trace failures never break the main chat flow.
+
+Phase 11.4: When a workspace_id is provided and the message requests
+a file modification, a persistent FileChangeProposal is created via
+the change service. The proposal is NOT applied — it requires explicit
+human approval through the Changes UI.
 """
 
 import logging
@@ -39,6 +44,7 @@ from app.hitl.service import HumanApprovalService
 from app.hitl.schemas import ApprovalResponse, HITLChatResponse
 from app.observability.repository import TraceRepository
 from app.observability.service import TraceService
+from app.workspace.file_modification_service import create_proposal_from_chat
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +277,34 @@ async def chat(
         # Save assistant response
         await memory_service.save_message(conv_id, "assistant", response_text)
 
+        # ------------------------------------------------------------------
+        # Phase 11.4 — Detect file modification intent and create proposal
+        # ------------------------------------------------------------------
+        file_change_proposal = None
+        if request.workspace_id:
+            try:
+                file_change_proposal = await create_proposal_from_chat(
+                    session=session,
+                    user_id=user_id,
+                    workspace_id=request.workspace_id,
+                    user_message=message,
+                )
+                if file_change_proposal:
+                    # Append proposal reference to the response
+                    response_text += (
+                        f"\n\n📋 **File Change Proposal Created**\n"
+                        f"- **File:** `{file_change_proposal['file_path']}`\n"
+                        f"- **Proposal ID:** `{file_change_proposal['id']}`\n"
+                        f"- **Status:** {file_change_proposal['status']}\n\n"
+                        f"Please review and approve/reject this change in the **Changes** tab."
+                    )
+                    # Update saved message with proposal info
+                    await memory_service.save_message(conv_id, "assistant", response_text)
+            except Exception as exc:
+                logger.warning(
+                    "File modification proposal creation failed (non-fatal): %s", exc
+                )
+
         # Phase 8 — Complete trace
         if trace and trace_service:
             try:
@@ -278,7 +312,11 @@ async def chat(
             except Exception as exc:
                 logger.warning("Failed to complete observability trace: %s", exc)
 
-        return HITLChatResponse(response=response_text, conversation_id=conv_id)
+        return HITLChatResponse(
+            response=response_text,
+            conversation_id=conv_id,
+            file_change_proposal=file_change_proposal,
+        )
 
     except TimeoutError:
         logger.error("LLM request timed out.")

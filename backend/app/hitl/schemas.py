@@ -87,3 +87,8 @@ class HITLChatResponse(BaseModel):
         default=None,
         description="The ID of the active conversation.",
     )
+    file_change_proposal: Optional[dict] = Field(
+        default=None,
+        description="File change proposal metadata when a file modification was proposed.",
+    )
+
