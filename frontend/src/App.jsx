@@ -10,7 +10,8 @@ import ApprovalsPanel from "./components/ApprovalsPanel.jsx";
 import MemoryPanel from "./components/MemoryPanel.jsx";
 import AuthPage from "./components/AuthPage.jsx";
 import WorkspaceFileExplorer from "./components/WorkspaceFileExplorer.jsx";
-import { FolderOpen, MessageSquare, FileCode, Columns } from "lucide-react";
+import WorkspaceChangesReview from "./components/WorkspaceChangesReview.jsx";
+import { FolderOpen, MessageSquare, FileCode, Columns, GitCommit } from "lucide-react";
 import { useAuth } from "./contexts/AuthContext.jsx";
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
   const [workspacesError, setWorkspacesError] = useState(null);
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
   const [chatWorkspaceMode, setChatWorkspaceMode] = useState("split");
+  const [pendingChangesCount, setPendingChangesCount] = useState(0);
 
   // Fetch conversation list from backend
   const fetchConversations = useCallback(async () => {
@@ -149,6 +151,10 @@ export default function App() {
         if (activeConversationId) {
           body.conversation_id = activeConversationId;
         }
+        // Phase 11.4: Include workspace_id for file modification detection
+        if (activeWorkspaceId) {
+          body.workspace_id = activeWorkspaceId;
+        }
 
         const response = await authFetch(`/api/chat`, {
           method: "POST",
@@ -173,8 +179,14 @@ export default function App() {
           content: data.response,
           requiresApproval: data.requires_approval,
           approval: data.approval,
+          fileChangeProposal: data.file_change_proposal || null,
         };
         setMessages((prev) => [...prev, aiMessage]);
+
+        // Phase 11.4: If a file change proposal was created, bump pending count
+        if (data.file_change_proposal) {
+          setPendingChangesCount((prev) => prev + 1);
+        }
 
         // Save the active conversation_id returned by the backend
         if (data.conversation_id) {
@@ -198,7 +210,7 @@ export default function App() {
         setIsChatLoading(false);
       }
     },
-    [isChatLoading, activeConversationId, authFetch, fetchConversations]
+    [isChatLoading, activeConversationId, activeWorkspaceId, authFetch, fetchConversations]
   );
 
   const handleApprovalAction = useCallback(
@@ -293,6 +305,19 @@ export default function App() {
                     <Columns size={13} />
                     <span>Split View</span>
                   </button>
+                  <button
+                    className={`chat-ws-tab-btn ${chatWorkspaceMode === "changes" ? "active" : ""}`}
+                    onClick={() => setChatWorkspaceMode("changes")}
+                    title="Review Proposed File Changes"
+                    role="tab"
+                    aria-selected={chatWorkspaceMode === "changes"}
+                  >
+                    <GitCommit size={13} />
+                    <span>Changes</span>
+                    {pendingChangesCount > 0 && (
+                      <span className="tab-pending-badge">{pendingChangesCount}</span>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -315,6 +340,16 @@ export default function App() {
               {activeWorkspace && (chatWorkspaceMode === "files" || chatWorkspaceMode === "split") && (
                 <div className="chat-explorer-column">
                   <WorkspaceFileExplorer workspace={activeWorkspace} authFetch={authFetch} />
+                </div>
+              )}
+
+              {activeWorkspace && chatWorkspaceMode === "changes" && (
+                <div className="chat-changes-column" style={{ flex: 1, width: "100%", height: "100%" }}>
+                  <WorkspaceChangesReview
+                    workspace={activeWorkspace}
+                    authFetch={authFetch}
+                    onPendingCountChange={setPendingChangesCount}
+                  />
                 </div>
               )}
             </div>

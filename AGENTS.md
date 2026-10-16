@@ -20,27 +20,24 @@ The project is built incrementally across 10 phases.
 
 ## Current Phase
 
-**Phase 10.1 — Security Foundation**
+**Phase 11.4 — Safe File Modification + Human Approval**
 
-The backend has been hardened with essential security features:
-- Secure configuration validation (no hardcoded keys).
-- Security headers (CSP, X-Frame-Options, X-Content-Type-Options).
-- Request validation and request size limits.
-- Configurable environment-driven CORS.
-- Basic in-memory rate limiting for expensive endpoints.
-- Safe error handling (no secrets exposed in stack traces).
+The workspace system enables safe, human-reviewed file modifications:
+- Architecture: `PROPOSE → DIFF → HUMAN APPROVAL → APPLY`
+- Persistent proposals stored in `file_change_proposals` table.
+- Exact unified diff generated and presented to human reviewer.
+- Stale-file protection: SHA-256 hashes verified prior to applying changes.
+- Atomic file replacement preventing partial or corrupt file writes.
+- Approval security: The AI can NEVER directly modify workspace files or approve its own proposals; approval requires explicit authenticated user action.
+- Read-only code viewer preserved; proposed changes reviewed in dedicated Changes UI.
 
-Phase 1 to Phase 9.1 are complete.
+Phase 1 to Phase 11.3 are complete.
 
 Do NOT implement features from future phases unless explicitly instructed.
 
 ```
-React Dashboard ↔ FastAPI Backend ↔ Supervisor Agent ↔ Specialized Agents ↔ Tools & Memory
+React Dashboard ↔ FastAPI Backend ↔ Supervisor Agent ↔ Specialized Agents ↔ Tools & Memory & Workspaces
 ```
-
-Phase 1 to Phase 8 are complete.
-
-Do NOT implement features from future phases unless explicitly instructed.
 
 ---
 
@@ -56,7 +53,13 @@ Do NOT implement features from future phases unless explicitly instructed.
 - ~~Phase 8: AI Evaluation framework & Observability (complete)~~
 - ~~Phase 9: Professional React Dashboard (complete)~~
 - ~~Phase 10.1: Security Foundation (complete)~~
-- Phase 10.2+: Production deployment (Authentication, Docker, PostgreSQL, Redis)
+- ~~Phase 10.2: Authentication & User Isolation (complete)~~
+- ~~Phase 11.1: Code Workspace Abstraction (complete)~~
+- ~~Phase 11.2: Workspace UI (complete)~~
+- ~~Phase 11.3: Safe File Reading & Code Analysis Foundation (complete)~~
+- ~~Phase 11.4: Safe File Modification + Human Approval (complete)~~
+- Phase 11.5+: Code execution, testing automation, autonomous git integrations
+
 
 ---
 

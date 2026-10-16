@@ -2,23 +2,38 @@
 
 **AI Software Engineering Assistant**
 
-DevAgent is an Agentic AI Software Engineering Platform built incrementally across 10 phases. Phase 10.1 is now complete — the platform provides a professional React dashboard and a hardened FastAPI backend.
+DevAgent is an Agentic AI Software Engineering Platform built incrementally. Phase 11.4 is now complete — the platform provides safe file modifications through an explicit proposal, diff inspection, and human approval workflow.
 
 ---
 
-## Current Phase: 10.1 — Security Foundation
+## Current Phase: 11.4 — Safe File Modification + Human Approval
 
-The backend has been hardened with essential security features on top of the full Phase 1–9.1 feature set.
+Phase 11.4 introduces a hardened, human-in-the-loop file modification system for user-owned code workspaces:
 
-**Security features added in Phase 10.1:**
-- Security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, X-XSS-Protection, Permissions-Policy)
-- Environment-driven CORS — no `allow_origins=["*"]`
-- Request body size limiting (configurable, default 1 MB)
-- `MAX_MESSAGE_LENGTH` enforcement in the chat endpoint
-- Configurable in-memory rate limiting for expensive endpoints
-- Startup configuration validation (warns on missing API keys, wildcard CORS)
-- Safe error handling — no stack traces or secrets exposed to API consumers
-- Sanitized settings summary for internal diagnostics
+- **Strict Modification Workflow**: `PROPOSE → DIFF → HUMAN APPROVAL → APPLY`.
+- **Absolute AI Safety Rule**: The AI is strictly prohibited from directly editing files on disk without explicit human approval.
+- **Unified Diff Generation**: Clean, exact diffs are generated via `difflib` and displayed in the frontend Changes review interface with line-by-line syntax styling.
+- **Stale-File Protection**: SHA-256 hashes of original file contents are computed and re-verified at approval time. If the file was modified on disk out-of-band, the proposal is rejected with `409 Conflict` to prevent overwriting unreviewed changes.
+- **Atomic File Replacement**: Approved modifications are written to a temporary file, flushed, synced, and atomically replaced (`os.replace`) to eliminate partial or corrupted writes.
+- **Approval API**:
+  - `POST /api/workspaces/{id}/changes` — Propose a file change.
+  - `GET /api/workspaces/{id}/changes` — List proposals for workspace.
+  - `GET /api/workspaces/{id}/changes/{proposal_id}` — Get single proposal and exact diff.
+  - `POST /api/workspaces/{id}/changes/{proposal_id}/approve` — Authenticated human approval + atomic write.
+  - `POST /api/workspaces/{id}/changes/{proposal_id}/reject` — Reject proposal without file modification.
+- **Current Limitation**: The AI agent cannot automatically or autonomously modify files, run tests, or execute terminal commands without explicit approval.
+
+---
+
+## Security Foundation (Phase 10 Hardening)
+
+- JWT authentication with secure password hashing (`bcrypt`) and user data isolation
+- Security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+- Environment-driven CORS configuration
+- Request body size limiting (default 1 MB) and rate limiting
+- Safe error handling — zero secret or stack trace leakage
+- Safe workspace isolation: absolute paths and path traversal (`../`, `C:\...`) blocked at the service boundary
+
 
 ### Full Architecture
 
